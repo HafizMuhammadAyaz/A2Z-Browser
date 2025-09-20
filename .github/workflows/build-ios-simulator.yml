@@ -1,0 +1,37 @@
+name: Build iOS Simulator .app
+
+on:
+  workflow_dispatch:   # lets you run manually from the Actions tab
+
+jobs:
+  build-ios-simulator:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '9.0.x'     # <-- change to '8.0.x' if your project uses .NET 8
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Publish iOS simulator app
+        run: |
+          # IMPORTANT: replace 'YourSolution.sln' with your solution or project file name
+          # and 'net7.0-ios' with your target TF (net8.0-ios if using .NET 8).
+          dotnet publish A2Z-Browser.sln -c Release -f net9.0-ios -p:Platform="iPhoneSimulator" -p:RuntimeIdentifier=iossimulator-x64 -o ./output
+
+      - name: Zip .app artifact
+        run: |
+          cd output
+          zip -r ../ios-simulator-app.zip *.app || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-app
+          path: ios-simulator-app.zip
