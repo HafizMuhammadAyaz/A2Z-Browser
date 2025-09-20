@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="A2Z_Browser.Views.LoginPage"
+             Title="A2Z Browser - Login">
+
+    <ScrollView>
+        <VerticalStackLayout Spacing="20" Padding="30">
+            <Image Source="logo.png" HeightRequest="100" />
+
+            <Label Text="A2Z Browser" FontSize="24" HorizontalOptions="Center" />
+
+            <Entry Placeholder="Username" Text="{Binding Username}" />
+            <Entry Placeholder="Password" Text="{Binding Password}" IsPassword="True" />
+
+            <Button Text="Login" Command="{Binding LoginCommand}" />
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+
+            <Label Text="{Binding ErrorMessage}" TextColor="Red" IsVisible="{Binding HasError}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
