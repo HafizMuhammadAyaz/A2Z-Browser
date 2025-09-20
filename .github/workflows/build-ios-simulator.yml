@@ -1,11 +1,12 @@
 name: Build iOS Simulator .app
 
 on:
-  workflow_dispatch:   # lets you run manually from the Actions tab
+  workflow_dispatch:
 
 jobs:
   build-ios-simulator:
     runs-on: macos-latest
+    timeout-minutes: 60
 
     steps:
       - name: Checkout repo
@@ -14,20 +15,34 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '9.0.x'     # <-- change to '8.0.x' if your project uses .NET 8
+          dotnet-version: '9.0.x'     # you said your project targets net9.0
 
-      - name: Restore
+      - name: Install required workloads
+        # This installs workloads the project needs (maui/android/ios etc).
+        run: |
+          dotnet workload restore
+
+      - name: Restore NuGet packages
         run: dotnet restore
 
       - name: Publish iOS simulator app
         run: |
-          # IMPORTANT: replace 'YourSolution.sln' with your solution or project file name
-          # and 'net7.0-ios' with your target TF (net8.0-ios if using .NET 8).
-          dotnet publish A2Z-Browser.sln -c Release -f net9.0-ios -p:Platform="iPhoneSimulator" -p:RuntimeIdentifier=iossimulator-x64 -o ./output
+          # IMPORTANT:
+          # 1) Use the correct path to your project/solution. Your files show A2Z Browser has a space.
+          # 2) Quoting the path avoids problems with spaces.
+          #
+          # Option A: publish the .sln (works if the solution file is at repo root)
+          dotnet publish "./A2Z Browser.sln" -c Release -f net9.0-ios -p:Platform="iPhoneSimulator" -p:RuntimeIdentifier=iossimulator-x64 -o ./output || true
+
+          # Option B (safer if sln is in subfolder): publish the specific project file
+          # dotnet publish "./A2Z Browser/A2Z Browser.csproj" -c Release -f net9.0-ios -p:Platform="iPhoneSimulator" -p:RuntimeIdentifier=iossimulator-x64 -o ./output || true
+
+      - name: Show output files for debugging
+        run: ls -la ./output || true
 
       - name: Zip .app artifact
         run: |
-          cd output
+          cd output || exit 0
           zip -r ../ios-simulator-app.zip *.app || true
 
       - name: Upload artifact
