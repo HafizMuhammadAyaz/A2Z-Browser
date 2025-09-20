@@ -29,24 +29,24 @@ jobs:
       - name: Restore NuGet packages
         run: dotnet restore
 
-      - name: Attempt publish (try solution, then project; x64 then arm64)
+      - name: Try build for iOS Simulator (x64 then arm64)
         shell: bash
         run: |
           set -euo pipefail
           OUTDIR=./output
           rm -rf "$OUTDIR"
           mkdir -p "$OUTDIR"
-          echo "=== Try publishing using solution file (x64 simulator) ==="
-          if dotnet publish "./A2Z Browser.sln" -c Release -f net9.0-ios -p:Platform="iPhoneSimulator" -p:RuntimeIdentifier=iossimulator-x64 -o "$OUTDIR"; then
-            echo "Published via solution (x64)"
+
+          echo "=== Attempt build for iossimulator-x64 ==="
+          if dotnet build "./A2Z Browser/A2Z Browser.csproj" -c Release -f net9.0-ios -p:Platform="iPhoneSimulator" -p:RuntimeIdentifier=iossimulator-x64 -o "$OUTDIR"; then
+            echo "Built for iossimulator-x64"
           else
-            echo "Solution publish failed. Will try publishing the iOS project file (x64)..."
-            if dotnet publish "./A2Z Browser/A2Z Browser.csproj" -c Release -f net9.0-ios -p:Platform="iPhoneSimulator" -p:RuntimeIdentifier=iossimulator-x64 -o "$OUTDIR"; then
-              echo "Published project (x64)"
+            echo "x64 build failed — trying iossimulator-arm64"
+            if dotnet build "./A2Z Browser/A2Z Browser.csproj" -c Release -f net9.0-ios -p:Platform="iPhoneSimulator" -p:RuntimeIdentifier=iossimulator-arm64 -o "$OUTDIR"; then
+              echo "Built for iossimulator-arm64"
             else
-              echo "x64 attempts failed. Trying arm64..."
-              # try arm64 project
-              dotnet publish "./A2Z Browser/A2Z Browser.csproj" -c Release -f net9.0-ios -p:Platform="iPhoneSimulator" -p:RuntimeIdentifier=iossimulator-arm64 -o "$OUTDIR"
+              echo "Both simulator builds failed. See the build logs above for errors."
+              exit 1
             fi
           fi
 
@@ -55,18 +55,17 @@ jobs:
           echo "=== output dir ==="
           ls -la ./output || true
           echo "=== recursive listing ==="
-          find ./output -maxdepth 3 -type f -print || true
+          find ./output -maxdepth 4 -type f -print || true
 
       - name: Zip .app artifact (only if .app exists)
         run: |
           cd output
-          # fail if no .app files found
           shopt -s nullglob
           APPS=(*.app)
           if [ ${#APPS[@]} -eq 0 ]; then
-            echo "ERROR: No .app found in ./output — publish step must have failed."
-            echo "Contents of output:"
-            ls -la ../output || true
+            echo "ERROR: No .app found in ./output — build step must have failed."
+            echo "Contents of output (one level up):"
+            ls -la .. || true
             exit 1
           fi
           zip -r ../ios-simulator-app.zip *.app
