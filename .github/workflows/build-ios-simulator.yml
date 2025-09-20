@@ -12,38 +12,64 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Setup .NET
+      - name: Setup .NET 9
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '9.0.x'     # you said your project targets net9.0
+          dotnet-version: '9.0.x'
 
-      - name: Install required workloads
-        # This installs workloads the project needs (maui/android/ios etc).
+      - name: Show repo root (debug)
+        run: |
+          echo "=== Repo root listing ==="
+          ls -la
+
+      - name: Install workloads (MAUI etc.)
         run: |
           dotnet workload restore
 
       - name: Restore NuGet packages
         run: dotnet restore
 
-      - name: Publish iOS simulator app
+      - name: Attempt publish (try solution, then project; x64 then arm64)
+        shell: bash
         run: |
-          # IMPORTANT:
-          # 1) Use the correct path to your project/solution. Your files show A2Z Browser has a space.
-          # 2) Quoting the path avoids problems with spaces.
-          #
-          # Option A: publish the .sln (works if the solution file is at repo root)
-          dotnet publish "./A2Z Browser.sln" -c Release -f net9.0-ios -p:Platform="iPhoneSimulator" -p:RuntimeIdentifier=iossimulator-x64 -o ./output || true
+          set -euo pipefail
+          OUTDIR=./output
+          rm -rf "$OUTDIR"
+          mkdir -p "$OUTDIR"
+          echo "=== Try publishing using solution file (x64 simulator) ==="
+          if dotnet publish "./A2Z Browser.sln" -c Release -f net9.0-ios -p:Platform="iPhoneSimulator" -p:RuntimeIdentifier=iossimulator-x64 -o "$OUTDIR"; then
+            echo "Published via solution (x64)"
+          else
+            echo "Solution publish failed. Will try publishing the iOS project file (x64)..."
+            if dotnet publish "./A2Z Browser/A2Z Browser.csproj" -c Release -f net9.0-ios -p:Platform="iPhoneSimulator" -p:RuntimeIdentifier=iossimulator-x64 -o "$OUTDIR"; then
+              echo "Published project (x64)"
+            else
+              echo "x64 attempts failed. Trying arm64..."
+              # try arm64 project
+              dotnet publish "./A2Z Browser/A2Z Browser.csproj" -c Release -f net9.0-ios -p:Platform="iPhoneSimulator" -p:RuntimeIdentifier=iossimulator-arm64 -o "$OUTDIR"
+            fi
+          fi
 
-          # Option B (safer if sln is in subfolder): publish the specific project file
-          # dotnet publish "./A2Z Browser/A2Z Browser.csproj" -c Release -f net9.0-ios -p:Platform="iPhoneSimulator" -p:RuntimeIdentifier=iossimulator-x64 -o ./output || true
-
-      - name: Show output files for debugging
-        run: ls -la ./output || true
-
-      - name: Zip .app artifact
+      - name: Show output directory contents (debug)
         run: |
-          cd output || exit 0
-          zip -r ../ios-simulator-app.zip *.app || true
+          echo "=== output dir ==="
+          ls -la ./output || true
+          echo "=== recursive listing ==="
+          find ./output -maxdepth 3 -type f -print || true
+
+      - name: Zip .app artifact (only if .app exists)
+        run: |
+          cd output
+          # fail if no .app files found
+          shopt -s nullglob
+          APPS=(*.app)
+          if [ ${#APPS[@]} -eq 0 ]; then
+            echo "ERROR: No .app found in ./output — publish step must have failed."
+            echo "Contents of output:"
+            ls -la ../output || true
+            exit 1
+          fi
+          zip -r ../ios-simulator-app.zip *.app
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
